@@ -93,7 +93,7 @@ def optimize(body):
     speeds=sorted(set([p['vmin']+i*p['dv'] for i in range(int((p['vmax']-p['vmin'])/p['dv'])+1)]+[p['vmax'],p['initial'],p['final']]))
     if len(speeds)>45:raise ValueError('Слишком много скоростей сетки. Увеличьте шаг скорости.')
     n=len(speeds)
-    if (len(grid)-1)*n*n>5000000:raise ValueError('Слишком большая расчётная сетка. Увеличьте шаг скорости или выберите более короткий маршрут.')
+    if (len(grid)-1)*n*n>12000000:raise ValueError('Слишком большая расчётная сетка. Увеличьте шаг скорости или выберите более короткий маршрут.')
     start=speeds.index(p['initial']);end=speeds.index(p['final']);vs=[v/3.6 for v in speeds]
     edges=[]
     # Compact edge storage per destination: predecessor, fuel, time.

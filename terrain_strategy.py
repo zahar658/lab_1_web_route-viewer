@@ -1,9 +1,10 @@
 """Forward terrain strategy with nonincreasing climb power. Not a fuel optimizer."""
 import math
+import bisect
 import truck_model as truck
 
-DEFAULTS=dict(lookahead=500,response=8,crest_power=20,cruise=70,dt=.5,grade_threshold=.002)
-LIMITS=dict(cruise=(1,150),lookahead=(50,5000),response=(1,60),crest_power=(0,100),dt=(.25,5),grade_threshold=(0,.05))
+DEFAULTS=dict(momentum=1.,lookahead=500,response=8,crest_power=20,cruise=70,dt=.5,grade_threshold=.002)
+LIMITS=dict(momentum=(0,1),cruise=(1,150),lookahead=(50,5000),response=(1,60),crest_power=(0,100),dt=(.25,5),grade_threshold=(0,.05))
 
 def settings(given):
     p=truck.parameters(given)
@@ -25,6 +26,7 @@ def hills(grid,threshold):
 def simulate(body):
     p=settings(body.get('params',{}));grid=truck.road_grid(body.get('points'),p['step'])
     xs=[a[0] for a in grid];total=xs[-1];budget=total/(p['average']/3.6)
+    heights=dict(grid)
     climbs=hills(grid,p['grade_threshold']);m=p['mass']+p['cargo'];me=m*p['rotation']
     x=0.;v=p['initial']/3.6;power=0.;time=fuel=0.;nodes=[];i=0;hill_i=0;entry=None;gear_prev=None
     vmax=p['vmax']/3.6;vmin=p['vmin']/3.6;crests=[];cuts=0;down_time=0.;down_fuel=0.
@@ -43,11 +45,15 @@ def simulate(body):
         
         resistance=m*9.81*(p['rolling']*c+sin)+.5*p['air']*p['cd']*p['area']*v*v
         # Before a climb aim for vmax. During it consume stored kinetic energy gradually.
-        target=min(vmax,max(p['cruise'],p['final'])/3.6);phase='равномерное движение'
+        target=min(vmax,max(p['vmin'],p['cruise'])/3.6);phase='равномерное движение'
+        hill_target=target
+        if hill:
+            rise=max(0.,heights[hill[1]]-heights[hill[0]])
+            hill_target=min(vmax,math.sqrt(target*target+2*9.81*rise*p['momentum']/p['rotation']))
         desired_acc=0.
         if uphill:
             phase='подъём'
-        elif hill and 0<=hill[0]-x<=p['lookahead']:target=vmax;phase='разгон перед подъёмом';desired_acc=p['accel']
+        elif hill and 0<=hill[0]-x<=p['lookahead']:target=hill_target;phase='разгон перед подъёмом';desired_acc=min(p['accel'],(target-v)/p['response'])
         else:desired_acc=(target-v)/p['response']
         if downhill and phase!='разгон перед подъёмом':phase='спуск: накат или поддержание скорости'
         # Endpoint speed has priority; braking horizon prevents an arbitrary finish speed.
@@ -73,10 +79,13 @@ def simulate(body):
                       max(0.,resistance+me*min(p['accel'],max(0.,(vmax-v)/p['dt']))))
         usable=min(cap_max,drive_cap*v/(1000*p['efficiency'])+p['aux'])
         if uphill:
-            if entry is None:entry=usable;climb_previous=usable
+            if entry is None:
+                # Entry power follows the selected pace and hill grade, not unconditional full throttle.
+                requested_acc=max(0.,(hill_target-v)/p['response'])
+                entry=min(usable,max(0.,resistance+me*requested_acc)*v/(1000*p['efficiency'])+p['aux']);climb_previous=entry
             fraction=max(0.,min(1.,(x-hill[0])/(hill[1]-hill[0])))
             request=min(usable,climb_previous,entry*(1-(1-p['crest_power']/100)*fraction))
-        elif phase=='разгон перед подъёмом':request=usable
+        elif phase=='разгон перед подъёмом':request=min(usable,required)
         else:request=min(request,usable)
         if phase=='подход к финишу':request=min(request,required)
         power=request
@@ -155,11 +164,11 @@ def optimize(body):
     best=None;manual=None;seen=set();trials=[]
     def evaluate(candidate):
         nonlocal best
-        key=tuple(candidate[k] for k in ('cruise','lookahead','crest_power'))
+        key=tuple(candidate[k] for k in ('cruise','lookahead','crest_power','momentum'))
         if key in seen:return
         seen.add(key)
         result=simulate(dict(points=body.get('points'),params=candidate))
-        trials.append(dict(cruise=key[0],lookahead=key[1],crest_power=key[2],
+        trials.append(dict(cruise=key[0],lookahead=key[1],crest_power=key[2],momentum=key[3],time_s=result.get('time_s'),
                            feasible=result['feasible'],fuel_l=result.get('fuel_l'),
                            message=result.get('message'),distance_km=result.get('distance_km')))
         if result['feasible'] and (best is None or result['fuel_l']<best['fuel_l']):best=result
@@ -170,7 +179,8 @@ def optimize(body):
         evaluate(dict(params,crest_power=crest,cruise=min(params['vmax'],max(params['average'],params['cruise']))))
     # Coordinate descent retains the best feasible result after each axis.
     for axis,values in (
-        ('cruise',[params['average'],(params['average']+params['vmax'])/2,params['vmax']]),
+        ('cruise',[params['average']*.75,params['average'],params['average']*1.15]),
+        ('momentum',[0.,.25,.5,1.]),
         ('lookahead',[50.,250.,1000.,2000.]),
         ('crest_power',[0.,20.,40.,60.,80.,100.]),
         ('cruise',[params['average'],(params['average']+params['vmax'])/2,params['vmax']]),
@@ -179,6 +189,22 @@ def optimize(body):
         for value in values:
             if axis=='cruise':value=min(params['vmax'],max(params['vmin'],value))
             evaluate(dict(anchor,**{axis:value}))
+    # Spend unused time by refining slower cruise policies, while retaining the best
+    # fuel result (never force arrival at the deadline if it costs more fuel).
+    if best is not None:
+        anchor=dict(best['params'])
+        for scale in (.7,.8,.9,.95,1.05):
+            evaluate(dict(anchor,cruise=max(params['vmin'],min(params['vmax'],anchor['cruise']*scale))))
+        anchor=dict(best['params'])
+        for momentum in (0.,.125,.25,.5,.75,1.):
+            evaluate(dict(anchor,momentum=momentum))
+    # Slower travel may require retaining more power on the climb. Search these
+    # together: varying cruise alone can falsely reject all economical slow runs.
+    if best is not None:
+        anchor=dict(best['params'])
+        for cruise in (params['average']*.85,params['average'],params['average']*1.05):
+            for crest in (20.,40.,60.,100.):
+                evaluate(dict(anchor,cruise=max(params['vmin'],min(params['vmax'],cruise)),crest_power=crest))
     if best is None:
         groups={}
         for t in trials:

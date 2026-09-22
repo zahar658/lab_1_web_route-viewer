@@ -105,6 +105,10 @@ def generate(body):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, max-age=0')
+        super().end_headers()
+
     def reply(self, code, payload, content_type='application/json; charset=utf-8'):
         data = json.dumps(payload, ensure_ascii=False).encode() if isinstance(payload, dict) else payload
         self.send_response(code)

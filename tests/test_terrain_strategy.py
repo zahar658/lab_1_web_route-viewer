@@ -11,7 +11,7 @@ assert len(climb)>20
 assert all(b['power']<=a['power']+1e-8 for a,b in zip(climb,climb[1:]))
 assert climb[-1]['power']<climb[0]['power']*.25
 assert hill['crests'][0]['speed']<climb[0]['speed']
-assert max(n['speed'] for n in hill['nodes'])<=90+1e-6
+assert max(n['speed'] for n in hill['nodes'])<=hill['params']['vmax']+1e-6
 assert min(n['speed'] for n in hill['nodes'])>=20-.3
 assert any(n['phase']=='разгон перед подъёмом' for n in hill['nodes'])
 assert hill['nodes'][0]['power']>0 # Immediate pedal response, no startup ramp.

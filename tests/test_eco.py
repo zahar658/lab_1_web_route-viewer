@@ -21,3 +21,9 @@ print('PASS: descent acceleration regression, constrained search, monotone climb
 print('Candidates',r['passes'],'fuel',r['fuel_l'],'baseline',r['baseline']['fuel_l'],'average',r['average_kmh'])
 import json
 Path('tmp/eco-result.json').write_text(json.dumps(r))
+
+assert s.truck.DEFAULTS['vmax']==120
+assert any(t['cruise']<body['params']['average'] for t in r['search'])
+assert len({t['momentum'] for t in r['search']})>1
+assert any(n['phase']=='разгон перед подъёмом' and n['target_speed']<120 for n in r['nodes'])
+print('PASS: 120 default, slower candidates, hill-specific targets, momentum search')

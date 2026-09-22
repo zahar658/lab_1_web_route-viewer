@@ -48,7 +48,7 @@
   const box=get('truck-results');box.replaceChildren();box.hidden=false;
   for(const text of [`Топливо: ${fmt(data.fuel_l)} л`, `Средний расход: ${fmt(data.litres_100km)} л/100 км`,`Время: ${fmt(data.time_s/3600)} ч / лимит ${fmt(data.budget_s/3600)} ч`,`Средняя скорость: ${fmt(data.average_kmh)} км/ч`,`Профиль: ${profile==='smooth'?'сглаженный':'исходный'}`,`Сетка: ${data.segments} участков, ${data.speed_states} скоростей`]){const div=document.createElement('div');div.textContent=text;box.append(div);}
   if(data.strategy==='terrain'){const extra=document.createElement('p');extra.textContent=`На спусках: ${fmt(data.downhill_fuel_l)} л за ${fmt(data.downhill_time_s)} с. Шагов с отсечкой: ${data.cutoff_steps}.`;box.append(extra);}
-  if(data.optimized){const chosen=document.createElement('p');chosen.textContent=`Проверено вариантов: ${data.passes}. Выбрано: разгон за ${fmt(data.params.lookahead)} м, крейсерская ${fmt(data.params.cruise)} км/ч, мощность у вершины ${fmt(data.params.crest_power)}%.` ;box.append(chosen);}
+  if(data.optimized){const chosen=document.createElement('p');chosen.textContent=`Проверено вариантов: ${data.passes}. Выбрано: разгон за ${fmt(data.params.lookahead)} м, крейсерская ${fmt(data.params.cruise)} км/ч, мощность у вершины ${fmt(data.params.crest_power)}%, запас разгона ${fmt((data.params.momentum??1)*100)}%. Запас времени: ${fmt((data.budget_s-data.time_s)/3600)} ч.` ;box.append(chosen);}
   const compare=document.createElement('p');compare.className='note';compare.textContent=data.strategy==='terrain'?(data.optimized?(data.baseline?`Исходные настройки: ${fmt(data.baseline.fuel_l)} л. Экономия: ${fmt(data.baseline.fuel_l-data.fuel_l)} л. Лучший из проверенных вариантов.`:'Лучший из проверенных вариантов. Исходные ручные настройки не прошли ограничения.'):'Ручная стратегия, без подбора по расходу.'):data.baseline?`Постоянная скорость при тех же условиях: ${fmt(data.baseline.fuel_l)} л.`:'Сравнение с постоянной скоростью доступно, когда начальная, конечная и заданная средняя скорости совпадают, а проезд возможен.';box.append(compare);
  }
  get('truck-calculate').onclick=async()=>{
@@ -58,11 +58,29 @@
   invalidate('Расчёт… На длинном маршруте это может занять несколько минут.');const token=version,route=points;
   const input={...params,mass:Number(get('mass').value),cargo:Number(get('cargo').value)};
   busy=true;get('truck-calculate').disabled=true;
+  const progressBox=get('calculation-progress'),progressBar=get('calculation-progress-bar'),progressText=get('calculation-progress-text');
+  get('truck-calculate').textContent='Расчёт: 0%';say('Расчёт: примерно 0%');
+  progressBox.hidden=false;progressBar.value=0;progressText.textContent='Расчёт: примерно 0%';
+  const started=Date.now(),length=route[route.length-1].distance-route[0].distance;
+  const terrain=get('truck-strategy').value==='terrain';
+  const speedStates=Math.ceil((input.vmax-input.vmin)/input.dv)+3;
+  const estimateSeconds=terrain?Math.max(3,length/1000*.1*(.5/input.dt)):Math.max(3,(route.length+length/input.step)*speedStates*speedStates*.000018);
+  let received=false;
+  const progressTimer=setInterval(()=>{
+   if(token!==version||route!==points){progressBox.hidden=true;return;}
+   const elapsed=(Date.now()-started)/1000;
+   const percent=Math.min(99,Math.floor(100*(1-Math.exp(-elapsed/estimateSeconds))));
+   get('truck-calculate').textContent=`Расчёт: ≈${percent}%`;
+   say(`Расчёт: примерно ${percent}% · прошло ${Math.floor(elapsed)} с. Оценка приблизительная.`);
+   progressBar.value=percent;
+   progressText.textContent=`Расчёт: примерно ${percent}% · ${Math.floor(elapsed)} с${percent>=95?' · расчёт продолжается':''}`;
+  },500);
   try{
    const response=await fetch('/api/optimize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:get('truck-strategy').value,params:input,points:route.map(p=>[p.distance,p[key]])})});
    let data;try{data=await response.json();}catch{throw Error('Сервер не вернул результат. Перезапустите обновлённый START.bat.');}
    if(token!==version||route!==points)return;
    if(!response.ok)throw Error(data.error||'Ошибка расчёта.');
+   received=true;progressBar.value=100;progressText.textContent='Расчёт завершён: 100%';
    if(!data.feasible){say(data.message+(data.fastest_average?` Максимальная средняя на сетке: ${fmt(data.fastest_average)} км/ч.`:''));return;}
    result=data;result.profile=profile;
    for(const p of points)Object.assign(p,sample(p.distance));
@@ -70,7 +88,7 @@
    refreshMetrics();get('metric').value='model_speed';get('axis').value='distance';get('axis').onchange();travel=0;paintVehicle();
    display(data,profile);say(data.strategy==='terrain'?`Стратегия рельефа рассчитана; ограничение времени соблюдено. На каждом подъёме мощность не возрастает; скорость на вершине определяется расчётом. Выбран допустимый профиль; подбор не гарантирует глобальный минимум топлива.`:'Допустимый профиль найден. Ограничение средней скорости соблюдено. Это приближённый поиск, не гарантия глобального минимума.');
   }catch(error){if(token===version)say(error instanceof TypeError?'Нет связи с локальным сервером. Проверьте START.bat.':error.message);}
-  finally{busy=false;get('truck-calculate').disabled=false;}
+  finally{clearInterval(progressTimer);get('truck-calculate').textContent='Рассчитать скорость';if(token!==version||route!==points)progressBox.hidden=true;else if(!received){progressBox.hidden=true;}busy=false;get('truck-calculate').disabled=false;}
  };
  get('truck-export').onclick=async()=>{
   if(!result)return;const keys=Object.keys(result.nodes[0]),config=JSON.stringify({params:result.params,profile:result.profile,strategy:result.strategy||'economy',method:result.method});
