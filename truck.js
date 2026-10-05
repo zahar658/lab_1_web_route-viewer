@@ -43,7 +43,7 @@
   if(!next.gears.length||next.gears.some((x,i)=>!Number.isFinite(x)||x<=0||(i&&x>=next.gears[i-1]))){get('truck-form-error').textContent='Передачи: положительные числа через пробел, строго по убыванию. Десятичный разделитель — точка.';return;}
   params=next;get('truck-form-error').textContent='';get('truck-dialog').close();invalidate();
  };
- for(const id of ['mass','cargo','truck-profile','truck-strategy'])get(id).addEventListener('change',()=>invalidate());
+ for(const id of ['mass','cargo','truck-profile'])get(id).addEventListener('change',()=>invalidate());
  function display(data,profile){
   const box=get('truck-results');box.replaceChildren();box.hidden=false;
   for(const text of [`Топливо: ${fmt(data.fuel_l)} л`, `Средний расход: ${fmt(data.litres_100km)} л/100 км`,`Время: ${fmt(data.time_s/3600)} ч / лимит ${fmt(data.budget_s/3600)} ч`,`Средняя скорость: ${fmt(data.average_kmh)} км/ч`,`Профиль: ${profile==='smooth'?'сглаженный':'исходный'}`,`Сетка: ${data.segments} участков, ${data.speed_states} скоростей`]){const div=document.createElement('div');div.textContent=text;box.append(div);}
@@ -62,9 +62,7 @@
   get('truck-calculate').textContent='Расчёт: 0%';say('Расчёт: примерно 0%');
   progressBox.hidden=false;progressBar.value=0;progressText.textContent='Расчёт: примерно 0%';
   const started=Date.now(),length=route[route.length-1].distance-route[0].distance;
-  const terrain=get('truck-strategy').value==='terrain';
-  const speedStates=Math.ceil((input.vmax-input.vmin)/input.dv)+3;
-  const estimateSeconds=terrain?Math.max(3,length/1000*.1*(.5/input.dt)):Math.max(3,(route.length+length/input.step)*speedStates*speedStates*.000018);
+  const estimateSeconds=Math.max(3,length/1000*.1*(.5/input.dt));
   let received=false;
   const progressTimer=setInterval(()=>{
    if(token!==version||route!==points){progressBox.hidden=true;return;}
@@ -76,7 +74,7 @@
    progressText.textContent=`Расчёт: примерно ${percent}% · ${Math.floor(elapsed)} с${percent>=95?' · расчёт продолжается':''}`;
   },500);
   try{
-   const response=await fetch('/api/optimize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:get('truck-strategy').value,params:input,points:route.map(p=>[p.distance,p[key]])})});
+   const response=await fetch('/api/optimize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'terrain',params:input,points:route.map(p=>[p.distance,p[key]])})});
    let data;try{data=await response.json();}catch{throw Error('Сервер не вернул результат. Перезапустите обновлённый START.bat.');}
    if(token!==version||route!==points)return;
    if(!response.ok)throw Error(data.error||'Ошибка расчёта.');
