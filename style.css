@@ -21,3 +21,6 @@ dialog{width:min(640px,calc(100vw - 28px));max-height:90dvh;overflow:auto;border
 #gaps-panel{padding:12px 0;border-bottom:1px solid #cbd6df;margin-bottom:16px}#gaps-panel summary{font-weight:bold;cursor:pointer}#gaps-panel button{margin-top:8px;width:100%}#gaps-panel p{overflow-wrap:anywhere}
 
 .route-experiments{flex:none;background:#f8fafc;padding:8px 28px;border-bottom:1px solid #cbd6df;max-height:42vh;overflow:auto}.route-experiments details{margin:0!important;padding:8px 0!important}.route-experiments summary{cursor:pointer;font-weight:650}.route-experiments .field{display:inline-flex;vertical-align:top;width:min(280px,100%);margin:8px 14px 8px 0}.route-experiments button{width:auto!important;margin:8px}.route-experiments p{max-width:1100px}#recovery-status{white-space:pre-line}#recovery-key{font:inherit}
+
+/* Страница прокручивается целиком; карта не сжимается под панели. */
+html,body{height:auto;overflow-y:auto}main{height:auto!important;min-height:0}.route-experiments{max-height:none;overflow:visible}.bottom{height:auto;min-height:0;flex:none;align-items:start}.map-wrap{height:80vh;min-height:650px}aside{overflow:visible;max-height:none}#route-picker-map{height:60vh;min-height:420px}@media(max-width:700px){.map-wrap{height:75vh;min-height:480px}}

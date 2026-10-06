@@ -14,6 +14,8 @@
 
   function removeResult() {
     recoveredText = null;
+    window.recoveredRouteReady = false;
+    if(window.TruckModel)window.TruckModel.invalidate('Восстановленные данные изменились. Выполните восстановление заново.');
     element('save-recovered').disabled = true;
     if (map && recoveredLayer) map.removeLayer(recoveredLayer);
     recoveredLayer = null;
@@ -88,18 +90,38 @@
       if (!response.ok) throw Error(result.error || 'Ошибка восстановления.');
       const route = RouteData.parse(result.csv);
       recoveredText = result.csv;
-      if (map) {
-        recoveredLayer = L.polyline(route.map(p => [p.lat, p.lon]), {color: '#8547bc', weight: 4, opacity: .85});
-        element('show-recovered').checked = true; visibility();
-      }
+      load(result.csv, 'Файл 3 — восстановленный маршрут', {recovered: true});
       element('save-recovered').disabled = false;
       const report = result.report;
-      message(`Скачков: ${report.gaps}. Добавлено точек API: ${report.inserted}. Сохранено наблюдений: ${report.observed}.\nДлина результата: ${report.length_km.toFixed(2)} км. ${report.gaps ? 'Полученный маршрут — предположение API. Точки API помечены в CSV.' : 'Скачков выше порога нет: точки не добавлялись.'}\nРасстояния и уклоны пересчитаны. Сохраните файл 3; для расчёта движения откройте его обычной кнопкой «Открыть маршрут».`);
+      message(`Скачков: ${report.gaps}. Добавлено точек API: ${report.inserted}. Сохранено наблюдений: ${report.observed}.\nДлина результата: ${report.length_km.toFixed(2)} км. ${report.gaps ? 'Полученный маршрут — предположение API. Точки API помечены в CSV.' : 'Скачков выше порога нет: точки не добавлялись.'}\nРасстояния и уклоны пересчитаны. Файл 3 уже выбран для графиков и расчёта скорости. Нажмите «Рассчитать скорость» в разделе «Транспорт».`);
     } catch (error) {
       message(error instanceof TypeError ? 'Нет связи с сервером. Проверьте окно START.bat.' : error.message);
     } finally {
       clearInterval(timer); element('recover-route').textContent = 'Восстановить файл 2';
       element('recovery-key').value = ''; lock(false);
+    }
+  };
+  window.RouteRecovery = {
+    beforeLoad() {
+      if (map && recoveredLayer) map.removeLayer(recoveredLayer);
+      recoveredLayer = null;
+    },
+    afterLoad(text) {
+      if (!window.recoveredRouteReady) return;
+      const parsed = RouteData.parse(text);
+      if (map) {
+        line.setStyle({color: '#8547bc', weight: 4, opacity: .85});
+        recoveredLayer = L.layerGroup([line]);
+        const csvRows = RouteData.csv(text);
+        const flagColumn = csvRows[0].indexOf('segment_recovered');
+        parsed.forEach((point, index) => {
+          if (index > 0 && csvRows[index+1][flagColumn] === '1') {
+            const previous = parsed[index-1];
+            recoveredLayer.addLayer(L.polyline([[previous.lat,previous.lon],[point.lat,point.lon]], {color:'#e13b40',weight:5,dashArray:'8 5'}));
+          }
+        });
+        element('show-recovered').checked = true; visibility();
+      }
     }
   };
   element('save-recovered').onclick = async () => {

@@ -54,13 +54,14 @@
 if (typeof window !== 'undefined' && typeof document !== 'undefined') (() => {
   const get = id => document.getElementById(id);
   let source = null, comparison = null, comparisonLayer = null, output = null;
+  let originalLine = null, originalEndpoints = [];
   let fileVersion = 0;
   const note = text => get('gaps-status').textContent = text;
 
   function visibility() {
     if (!map) return;
-    if (line) get('show-original').checked ? line.addTo(map) : map.removeLayer(line);
-    endpoints.forEach(layer => get('show-original').checked ? layer.addTo(map) : map.removeLayer(layer));
+    if (originalLine) get('show-original').checked ? originalLine.addTo(map) : map.removeLayer(originalLine);
+    originalEndpoints.forEach(layer => get('show-original').checked ? layer.addTo(map) : map.removeLayer(layer));
     if (comparisonLayer) get('show-damaged').checked ? comparisonLayer.addTo(map) : map.removeLayer(comparisonLayer);
     if (comparisonLayer && get('show-damaged').checked) comparisonLayer.eachLayer(layer => layer.bringToFront?.());
   }
@@ -96,7 +97,10 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') (() => {
     visibility();
   }
 
-  window.RouteGaps = {onLoad(text, name) {
+  window.RouteGaps = {restoreVisibility: visibility, onLoad(text, name) {
+    if (map && originalLine) map.removeLayer(originalLine);
+    if (map) originalEndpoints.forEach(layer => map.removeLayer(layer));
+    originalLine = line; originalEndpoints = [...endpoints];
     fileVersion++;
     source = {text, name, points: RouteData.parse(text)};
     comparison = null; output = null;

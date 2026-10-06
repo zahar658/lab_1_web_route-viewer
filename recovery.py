@@ -55,11 +55,9 @@ def recover(body, request_route):
         jump = route_to_csv.distance(observations[index-1], observations[index])
         if jump > threshold * 1000:
             gaps.append((index, jump))
-    if len(gaps) > 50:
-        raise ValueError(f'Найдено {len(gaps)} скачков. Максимум 50 запросов за восстановление; увеличьте порог скачка.')
     missing = dict(gaps)
     coordinates = [observations[0]]
-    provenance = [('observed', 0)]
+    provenance = [('observed', 0, 0)]
     reports = []
     for index in range(1, len(observations)):
         if index in missing:
@@ -79,20 +77,23 @@ def recover(body, request_route):
                 if route_to_csv.distance(coordinates[-1], point) < .1 or route_to_csv.distance(point, last) < .1:
                     continue
                 coordinates.append(point)
-                provenance.append(('api', len(reports)+1))
+                provenance.append(('api', len(reports)+1, len(reports)+1))
                 inserted += 1
             reports.append(dict(before_observation=index, after_observation=index+1,
                                 jump_km=missing[index]/1000, inserted=inserted,
                                 snap_start_m=snap_start, snap_end_m=snap_end))
         coordinates.append(observations[index])
-        provenance.append(('observed', 0))
+        provenance.append(('observed', 0, len(reports) if index in missing else 0))
         if len(coordinates) > 200000:
             raise ValueError('После восстановления больше 200 000 точек. Выберите более короткий маршрут.')
     # Геометрия изменилась: пересчитываем расстояния, уклоны и сглаживание.
     rows, length = route_to_csv.build_rows({'features': [{'geometry': {'type': 'LineString', 'coordinates': coordinates}}]}, window)
-    for row, (source, gap) in zip(rows, provenance):
+    for row, (source, gap, segment_gap) in zip(rows, provenance):
         row['point_source'] = source
         row['recovery_gap'] = gap
+        row['is_recovered'] = int(source == 'api')
+        row['segment_recovered'] = int(segment_gap > 0)
+        row['segment_recovery_gap'] = segment_gap
     output = io.StringIO(newline='')
     writer = csv.DictWriter(output, fieldnames=list(rows[0]))
     writer.writeheader()

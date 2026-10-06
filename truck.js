@@ -52,7 +52,7 @@
   const compare=document.createElement('p');compare.className='note';compare.textContent=data.strategy==='terrain'?(data.optimized?(data.baseline?`Исходные настройки: ${fmt(data.baseline.fuel_l)} л. Экономия: ${fmt(data.baseline.fuel_l-data.fuel_l)} л. Лучший из проверенных вариантов.`:'Лучший из проверенных вариантов. Исходные ручные настройки не прошли ограничения.'):'Ручная стратегия, без подбора по расходу.'):data.baseline?`Постоянная скорость при тех же условиях: ${fmt(data.baseline.fuel_l)} л.`:'Сравнение с постоянной скоростью доступно, когда начальная, конечная и заданная средняя скорости совпадают, а проезд возможен.';box.append(compare);
  }
  get('truck-calculate').onclick=async()=>{
-  if(busy)return;if(!points.length){say('Сначала откройте CSV маршрута.');return;}
+  if(busy)return;if(!window.recoveredRouteReady){say('Расчёт скорости выполняется по восстановленным данным. Восстановите файл 2 или откройте сохранённый файл 3.');return;}if(!points.length){say('Сначала откройте CSV маршрута.');return;}
   const profile=get('truck-profile').value,key=profile==='smooth'?'elevation_smoothed_m':'elevation_m';
   if(points.some(p=>!Number.isFinite(p[key]))){say('В выбранном профиле есть пропуски высот. Выберите другой профиль или создайте CSV со сглаживанием.');return;}
   invalidate('Расчёт… На длинном маршруте это может занять несколько минут.');const token=version,route=points;

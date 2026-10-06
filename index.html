@@ -14,7 +14,7 @@
 <span class="logo">↗</span>
 <div>
 <h1>Профиль маршрута</h1>
-<span class="sub">Карта и рельеф · R1</span>
+<span class="sub">Карта и рельеф · R4</span>
 </div>
 </div>
 <div class="actions">
@@ -53,7 +53,7 @@
 </div>
 </header>
 <main><section class="route-experiments"><details id="gaps-panel"><summary>Пропуски навигации</summary>
-<p>Файл 1 — маршрут, загруженный кнопкой «Открыть маршрут». Графики и расчёт относятся к нему.</p>
+<p>Файл 1 — маршрут, загруженный кнопкой «Открыть маршрут». Расчёт скорости выполняется после восстановления по файлу 3.</p>
 <label><input id="show-original" type="checkbox" checked> Файл 1 · бирюзовый</label><p id="original-name">не загружен</p>
 <label><input id="show-damaged" type="checkbox" checked> Файл 2 · оранжевый</label><p id="comparison-name">не загружен</p>
 
@@ -72,7 +72,7 @@
 <p>Без временных меток это порог расстояния, а не скорости. Редкие исходные точки тоже могут быть приняты за пропуск. API предлагает вероятную дорогу, а не гарантированно исходную.</p>
 <button id="recover-route" disabled>Восстановить файл 2</button><button id="save-recovered" disabled>Сохранить файл 3</button>
 <label><input id="show-recovery-input" type="checkbox" checked> Файл 2 · точки оранжевым</label>
-<label><input id="show-recovered" type="checkbox" checked> Файл 3 · фиолетовый</label>
+<label><input id="show-recovered" type="checkbox" checked> Файл 3 · фиолетовый, восстановленные участки — красный пунктир</label>
 <p id="recovery-status" role="status"></p></details></section>
 <section class="profile">
 <div class="toolbar">
@@ -323,5 +323,5 @@
 </script>
 <script src="route-controls.js">
 </script>
-<script src="gaps.js?v=G1"></script><script src="recovery.js?v=R1"></script></body>
+<script src="gaps.js?v=G1"></script><script src="recovery.js?v=R3"></script></body>
 </html>
