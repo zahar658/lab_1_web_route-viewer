@@ -14,7 +14,7 @@
 <span class="logo">↗</span>
 <div>
 <h1>Профиль маршрута</h1>
-<span class="sub">Карта и рельеф · R4</span>
+<span class="sub">Карта и рельеф · R5</span>
 </div>
 </div>
 <div class="actions">
@@ -253,22 +253,12 @@
 </div>
 </fieldset>
 <fieldset>
-<legend>Стратегия рельефа</legend>
+<legend>Точность моделирования</legend>
 <div class="truck-fields">
-<label class="field">Разгон до подъёма, м<input id="truck-lookahead" name="lookahead" type="number" min="50" max="5000" step="any" value="500" required>
-</label>
-<label class="field">Скорость на ровном участке, км/ч<input id="truck-cruise" name="cruise" type="number" min="1" max="150" step="any" value="70" required>
-</label>
-<label class="field">Время реакции скорости, с<input id="truck-response" name="response" type="number" min="1" max="60" step="any" value="8" required>
-</label>
-<label class="field">Мощность у вершины, % от входной<input id="truck-crest_power" name="crest_power" type="number" min="0" max="100" step="any" value="20" required>
-</label>
 <label class="field">Шаг времени, с<input id="truck-dt" name="dt" type="number" min="0.25" max="5" step="any" value="0.5" required>
 </label>
-<label class="field">Порог подъёма/спуска, доля<input id="truck-grade_threshold" name="grade_threshold" type="number" min="0" max="0.05" step="any" value="0.002" required>
-</label>
 </div>
-<p class="note">В режиме экономии крейсерская скорость, дистанция разгона и мощность у вершины подбираются автоматически; введённые значения используются как исходный вариант. 0,002 = 0,2% уклона. Скорость перед подъёмом подбирается с учётом его высоты и запаса разгона; максимум не является обязательной целью. На подъёме мощность снижается к заданной доле без повторного повышения. Скорость определяется физикой; минимальная скорость остаётся ограничением. На спуске используется накат, если его достаточно. На пологом спуске разрешена тяга для поддержания выбранной скорости и разгона перед подъёмом.</p>
+<p class="note">Скорость на ровном участке, начало разгона и снижение мощности на подъёме подбираются автоматически по расходу топлива и ограничениям ТС. Скорость на всём маршруте, включая вершины, должна быть не ниже заданной минимальной. Порог рельефа фиксирован: 0,2%; время реакции: 8 с. На пологом спуске разрешена тяга.</p>
 </fieldset>
 <label class="field">Передачи — числа через пробел, от первой к высшей<input id="truck-gears" value="12 9.2 7.1 5.5 4.2 3.2 2.5 1.9 1.45 1.1 0.85 0.65" required>
 </label>

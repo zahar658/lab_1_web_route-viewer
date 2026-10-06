@@ -7,7 +7,7 @@ LIMITS = dict(momentum=(0, 1), cruise=(1, 150), lookahead=(50, 5000), response=(
 def settings(given):
     p = truck.parameters(given)
     for k, default in DEFAULTS.items():
-        value = given.get(k, default)
+        value = default if k in ('response', 'grade_threshold') else given.get(k, default)
         lo, hi = LIMITS[k]
         if isinstance(value, bool) or not isinstance(value, (int, float)) or (not math.isfinite(value)) or (not lo <= value <= hi):
             raise ValueError(f'{k}: допустимо {lo}–{hi}.')
@@ -68,7 +68,7 @@ def simulate(body):
         c = 1 / math.sqrt(1 + grade * grade)
         sin = grade * c
         while hill_i < len(climbs) and x >= climbs[hill_i][1] - 1e-06:
-            crests.append(dict(distance=climbs[hill_i][1], speed=v * 3.6, target=None))
+            crests.append(dict(distance=climbs[hill_i][1], speed=v * 3.6, target=p['vmin']))
             hill_i += 1
             entry = None
         hill = climbs[hill_i] if hill_i < len(climbs) else None
@@ -156,7 +156,7 @@ def simulate(body):
             if acc > p['accel'] + 1e-07:
                 return fail(f'На {x / 1000:.3f} км превышено допустимое ускорение.')
             next_v = v + acc * step
-            if next_v < vmin - 0.3 / 3.6:
+            if next_v < vmin - 1e-9:
                 return fail(f"На {x / 1000:.3f} км скорость {next_v * 3.6:.2f} км/ч ниже минимума {p['vmin']:.2f} км/ч. Уклон {grade * 100:.2f}%, мощность {power:.1f} кВт. Не хватает тяги при выбранной политике снижения мощности.")
             ds = (v + next_v) / 2 * step
             advance = ds * c
@@ -205,21 +205,26 @@ def simulate(body):
         time += step
         fuel += spent
     if hill_i < len(climbs) and abs(climbs[hill_i][1] - total) < 1e-05:
-        crests.append(dict(distance=total, speed=v * 3.6, target=None))
+        crests.append(dict(distance=total, speed=v * 3.6, target=p['vmin']))
     nodes.append(dict(distance=total, height=grid[-1][1], speed=v * 3.6, time=time, fuel=fuel, rate=0, rate_start=0, rate_end=0, gear=0, power=0, power_start=0, power_end=0, available=0, peak_power=0, accel=0, duration=0, phase='финиш', target_speed=p['final'], cutoff=False, brake_force=0))
     if abs(v * 3.6 - p['final']) > 1:
         return fail(f"На финише получено {v * 3.6:.1f} км/ч вместо {p['final']:.1f}. Скорость на вершине и условие финиша могут конфликтовать.")
     if time > budget + 1e-06:
-        return dict(feasible=False, strategy='terrain', message=f"Стратегия не выдержала среднюю скорость: {total / time * 3.6:.2f} км/ч вместо {p['average']:.2f}. Уменьшите требование или используйте экономичный поиск.", actual_average=total / time * 3.6)
+        return dict(feasible=False, strategy='terrain', message=f"Стратегия не выдержала среднюю скорость: {total / time * 3.6:.2f} км/ч вместо {p['average']:.2f}. Проверьте требуемую среднюю скорость и возможности ТС.", actual_average=total / time * 3.6)
     return dict(feasible=True, strategy='terrain', nodes=nodes, params=p, fuel_l=fuel, time_s=time, average_kmh=total / time * 3.6, litres_100km=fuel / (total / 100000), budget_s=budget, segments=len(nodes) - 1, speed_states=0, passes=1, baseline=None, crests=crests, cutoff_steps=cuts, downhill_time_s=down_time, downhill_fuel_l=down_fuel, method='Terrain controller with nonincreasing climb power; heuristic, not an optimizer')
 
 def optimize(body):
     """Bounded coordinate search over the user's monotone-power policy.
 
     All candidates use identical physics, integration precision and constraints.
-    Initial manual policy is always included, so a feasible result cannot worsen it.
+    A default automatic seed is included; user controls only trip and vehicle constraints.
     """
-    params = settings(body.get('params', {}))
+    # User input cannot set the policy searched by this automatic mode.
+    supplied = dict(body.get('params', {}))
+    for key in ('cruise', 'lookahead', 'crest_power', 'momentum'):
+        supplied.pop(key, None)
+    params = settings(supplied)
+    params['cruise'] = max(params['vmin'], min(params['vmax'], params['average']))
     best = None
     manual = None
     seen = set()
